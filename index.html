@@ -207,39 +207,50 @@
       }
     }
 
-    async function saveClock(actionType) {
-      if (!selectedEmployee) {
-        message.textContent = "従業員を選択してください";
-        return;
-      }
+async function saveClock(actionType) {
+  if (!selectedEmployee) {
+    message.textContent = "従業員を選択してください";
+    return;
+  }
 
-      try {
-        message.textContent = "保存中...";
-        const response = await fetch(CONFIG.GAS_URL, {
-          method: "POST",
-          headers: {
-            "Content-Type": "text/plain;charset=utf-8"
-          },
-          body: JSON.stringify({
-            action: "clock",
-            name: selectedEmployee.name,
-            employee_id: selectedEmployee.employee_id,
-            actionType: actionType
-          })
-        });
+  try {
+    message.textContent = "保存中...";
+    const response = await fetch(CONFIG.GAS_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "text/plain;charset=utf-8"
+      },
+      body: JSON.stringify({
+        action: "clock",
+        name: selectedEmployee.name,
+        employee_id: selectedEmployee.employee_id,
+        actionType: actionType
+      })
+    });
 
-        const data = await response.json();
+    const data = await response.json();
 
-        if (!data.success) {
-          throw new Error(data.message || "保存に失敗しました");
-        }
-
-        message.textContent = data.message;
-      } catch (error) {
-        console.error(error);
-        message.textContent = "保存に失敗しました";
-      }
+    if (!data.success) {
+      throw new Error(data.message || "保存に失敗しました");
     }
+
+    message.textContent = data.message;
+
+    // 打刻後に選択解除
+    selectedEmployee = "";
+    selectedName.textContent = "未選択";
+    renderEmployees();
+
+    // 3秒後にメッセージを消す
+    setTimeout(() => {
+      message.textContent = "";
+    }, 3000);
+
+  } catch (error) {
+    console.error(error);
+    message.textContent = "保存に失敗しました";
+  }
+}
 
     clockInBtn.addEventListener("click", () => saveClock("出勤"));
     clockOutBtn.addEventListener("click", () => saveClock("退勤"));
