@@ -149,6 +149,12 @@
     let employees = [];
     let selectedEmployee = "";
 
+    let lastClock = {
+  employeeId: "",
+  actionType: "",
+  timestamp: 0
+};
+
     const employeeList = document.getElementById("employeeList");
     const selectedName = document.getElementById("selectedName");
     const message = document.getElementById("message");
@@ -213,6 +219,18 @@ async function saveClock(actionType) {
     return;
   }
 
+  const now = Date.now();
+  const isSameEmployee = lastClock.employeeId === selectedEmployee.employee_id;
+  const isSameAction = lastClock.actionType === actionType;
+  const isWithin10Seconds = now - lastClock.timestamp < 10000;
+
+  if (isSameEmployee && isSameAction && isWithin10Seconds) {
+    const ok = confirm(`${selectedEmployee.name} さんの${actionType}が直前にも記録されています。もう一度記録しますか？`);
+    if (!ok) {
+      return;
+    }
+  }
+
   try {
     message.textContent = "保存中...";
     const response = await fetch(CONFIG.GAS_URL, {
@@ -235,6 +253,13 @@ async function saveClock(actionType) {
     }
 
     message.textContent = data.message;
+
+    // 直前打刻を記録
+    lastClock = {
+      employeeId: selectedEmployee.employee_id,
+      actionType: actionType,
+      timestamp: now
+    };
 
     // 打刻後に選択解除
     selectedEmployee = "";
