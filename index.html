@@ -190,4 +190,46 @@
 
       employees.forEach((name) => {
         const button = document.createElement("button");
-        button.className = "
+        button.className = "employee-btn";
+        button.textContent = name;
+
+        if (selectedEmployee === name) {
+          button.classList.add("selected");
+        }
+
+        button.addEventListener("click", () => {
+          selectedEmployee = name;
+          selectedName.textContent = name;
+          message.textContent = "";
+          renderEmployees();
+        });
+
+        employeeList.appendChild(button);
+      });
+    }
+
+    function handleClock(action) {
+      if (!selectedEmployee) {
+        message.textContent = "従業員を選択してください";
+        return;
+      }
+
+      const actionText = action === "出勤" ? "出勤" : "退勤";
+      const now = new Date().toLocaleString("ja-JP");
+      message.textContent = `${selectedEmployee} さんの${actionText}を記録しました（テスト表示） ${now}`;
+    }
+
+    clockInBtn.addEventListener("click", () => {
+      handleClock("出勤");
+    });
+
+    clockOutBtn.addEventListener("click", () => {
+      handleClock("退勤");
+    });
+
+    updateClock();
+    setInterval(updateClock, 1000);
+    renderEmployees();
+  </script>
+</body>
+</html>
