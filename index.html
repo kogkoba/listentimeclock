@@ -4,8 +4,190 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>LISTEN Time Clock</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      background: #f4f7fb;
+      color: #222;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 24px 16px 40px;
+    }
+
+    h1 {
+      text-align: center;
+      margin: 0 0 12px;
+      font-size: 2rem;
+    }
+
+    .clock {
+      text-align: center;
+      font-size: 1.2rem;
+      margin-bottom: 24px;
+      font-weight: bold;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+    }
+
+    .section-title {
+      font-size: 1.1rem;
+      font-weight: bold;
+      margin-bottom: 16px;
+    }
+
+    .employee-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px;
+    }
+
+    .employee-btn {
+      border: none;
+      border-radius: 14px;
+      padding: 22px 12px;
+      font-size: 1.2rem;
+      font-weight: bold;
+      background: #e9eef7;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    .employee-btn:hover {
+      background: #dbe5f5;
+    }
+
+    .employee-btn.selected {
+      background: #2563eb;
+      color: #fff;
+    }
+
+    .selected-name {
+      font-size: 1.5rem;
+      text-align: center;
+      font-weight: bold;
+      min-height: 2em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .action-buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .action-btn {
+      border: none;
+      border-radius: 16px;
+      padding: 24px 12px;
+      font-size: 1.5rem;
+      font-weight: bold;
+      cursor: pointer;
+      color: #fff;
+    }
+
+    .clock-in {
+      background: #16a34a;
+    }
+
+    .clock-out {
+      background: #dc2626;
+    }
+
+    .message {
+      text-align: center;
+      font-size: 1.1rem;
+      min-height: 1.5em;
+      font-weight: bold;
+    }
+
+    @media (max-width: 700px) {
+      .employee-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .action-buttons {
+        grid-template-columns: 1fr;
+      }
+
+      h1 {
+        font-size: 1.7rem;
+      }
+    }
+  </style>
 </head>
 <body>
-  <h1>LISTEN Time Clock</h1>
-</body>
-</html>
+  <div class="container">
+    <h1>LISTEN Time Clock</h1>
+    <div class="clock" id="clock"></div>
+
+    <div class="card">
+      <div class="section-title">従業員を選択してください</div>
+      <div class="employee-grid" id="employeeList"></div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">選択中</div>
+      <div class="selected-name" id="selectedName">未選択</div>
+    </div>
+
+    <div class="card">
+      <div class="action-buttons">
+        <button class="action-btn clock-in" id="clockInBtn">出勤</button>
+        <button class="action-btn clock-out" id="clockOutBtn">退勤</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="message" id="message"></div>
+    </div>
+  </div>
+
+  <script>
+    const employees = [
+      "田中",
+      "佐藤",
+      "鈴木",
+      "山本",
+      "中村",
+      "井上",
+      "小林",
+      "木村",
+      "高橋",
+      "松本"
+    ];
+
+    let selectedEmployee = "";
+
+    const employeeList = document.getElementById("employeeList");
+    const selectedName = document.getElementById("selectedName");
+    const message = document.getElementById("message");
+    const clockInBtn = document.getElementById("clockInBtn");
+    const clockOutBtn = document.getElementById("clockOutBtn");
+
+    function updateClock() {
+      const now = new Date();
+      document.getElementById("clock").textContent = now.toLocaleString("ja-JP");
+    }
+
+    function renderEmployees() {
+      employeeList.innerHTML = "";
+
+      employees.forEach((name) => {
+        const button = document.createElement("button");
+        button.className = "
