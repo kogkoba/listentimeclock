@@ -5,9 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>LISTEN Time Clock</title>
   <style>
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
@@ -101,33 +99,21 @@
       color: #fff;
     }
 
-    .clock-in {
-      background: #16a34a;
-    }
-
-    .clock-out {
-      background: #dc2626;
-    }
+    .clock-in { background: #16a34a; }
+    .clock-out { background: #dc2626; }
 
     .message {
       text-align: center;
       font-size: 1.1rem;
       min-height: 1.5em;
       font-weight: bold;
+      white-space: pre-line;
     }
 
     @media (max-width: 700px) {
-      .employee-grid {
-        grid-template-columns: 1fr;
-      }
-
-      .action-buttons {
-        grid-template-columns: 1fr;
-      }
-
-      h1 {
-        font-size: 1.7rem;
-      }
+      .employee-grid { grid-template-columns: 1fr; }
+      .action-buttons { grid-template-columns: 1fr; }
+      h1 { font-size: 1.7rem; }
     }
   </style>
 </head>
@@ -158,20 +144,9 @@
     </div>
   </div>
 
+  <script src="config.js"></script>
   <script>
-    const employees = [
-      "田中",
-      "佐藤",
-      "鈴木",
-      "山本",
-      "中村",
-      "井上",
-      "小林",
-      "木村",
-      "高橋",
-      "松本"
-    ];
-
+    let employees = [];
     let selectedEmployee = "";
 
     const employeeList = document.getElementById("employeeList");
@@ -188,18 +163,23 @@
     function renderEmployees() {
       employeeList.innerHTML = "";
 
-      employees.forEach((name) => {
+      if (!employees.length) {
+        employeeList.innerHTML = "<div>従業員がいません</div>";
+        return;
+      }
+
+      employees.forEach((employee) => {
         const button = document.createElement("button");
         button.className = "employee-btn";
-        button.textContent = name;
+        button.textContent = employee.name;
 
-        if (selectedEmployee === name) {
+        if (selectedEmployee && selectedEmployee.employee_id === employee.employee_id) {
           button.classList.add("selected");
         }
 
         button.addEventListener("click", () => {
-          selectedEmployee = name;
-          selectedName.textContent = name;
+          selectedEmployee = employee;
+          selectedName.textContent = employee.name;
           message.textContent = "";
           renderEmployees();
         });
@@ -208,28 +188,65 @@
       });
     }
 
-    function handleClock(action) {
+    async function loadEmployees() {
+      try {
+        message.textContent = "従業員一覧を読み込み中...";
+        const response = await fetch(`${CONFIG.GAS_URL}?action=getEmployees`);
+        const data = await response.json();
+
+        if (!data.success) {
+          throw new Error(data.message || "従業員一覧の取得に失敗しました");
+        }
+
+        employees = data.employees || [];
+        renderEmployees();
+        message.textContent = "";
+      } catch (error) {
+        console.error(error);
+        message.textContent = "従業員一覧の取得に失敗しました";
+      }
+    }
+
+    async function saveClock(actionType) {
       if (!selectedEmployee) {
         message.textContent = "従業員を選択してください";
         return;
       }
 
-      const actionText = action === "出勤" ? "出勤" : "退勤";
-      const now = new Date().toLocaleString("ja-JP");
-      message.textContent = `${selectedEmployee} さんの${actionText}を記録しました（テスト表示） ${now}`;
+      try {
+        message.textContent = "保存中...";
+        const response = await fetch(CONFIG.GAS_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "text/plain;charset=utf-8"
+          },
+          body: JSON.stringify({
+            action: "clock",
+            name: selectedEmployee.name,
+            employee_id: selectedEmployee.employee_id,
+            actionType: actionType
+          })
+        });
+
+        const data = await response.json();
+
+        if (!data.success) {
+          throw new Error(data.message || "保存に失敗しました");
+        }
+
+        message.textContent = data.message;
+      } catch (error) {
+        console.error(error);
+        message.textContent = "保存に失敗しました";
+      }
     }
 
-    clockInBtn.addEventListener("click", () => {
-      handleClock("出勤");
-    });
-
-    clockOutBtn.addEventListener("click", () => {
-      handleClock("退勤");
-    });
+    clockInBtn.addEventListener("click", () => saveClock("出勤"));
+    clockOutBtn.addEventListener("click", () => saveClock("退勤"));
 
     updateClock();
     setInterval(updateClock, 1000);
-    renderEmployees();
+    loadEmployees();
   </script>
 </body>
 </html>
