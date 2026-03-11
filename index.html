@@ -455,40 +455,45 @@
         statusMessage.textContent = "一覧の取得に失敗しました";
       }
     }
+function exportStatusCsv() {
+  if (!currentStatuses.length) {
+    statusMessage.textContent = "出力できるデータがありません";
+    return;
+  }
 
-    function exportStatusCsv() {
-      if (!currentStatuses.length) {
-        statusMessage.textContent = "出力できるデータがありません";
-        return;
-      }
+  const dateValue = statusDate.value || getTodayForInput();
+  const header = ["日付", "氏名", "出勤", "退勤", "状態"];
 
-      const dateValue = statusDate.value || getTodayForInput();
-      const header = ["日付", "氏名", "出勤", "退勤", "状態"];
+  const rows = currentStatuses.map(item => [
+    dateValue.replaceAll("-", "/"),
+    item.name || "",
+    item.clockIn || "",
+    item.clockOut || "",
+    item.status || ""
+  ]);
 
-      const rows = currentStatuses.map(item => [
-        dateValue.replaceAll("-", "/"),
-        item.name || "",
-        item.clockIn || "",
-        item.clockOut || "",
-        item.status || ""
-      ]);
+  const csvLines = [header, ...rows].map(row =>
+    row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(",")
+  );
 
-      const csvLines = [header, ...rows].map(row =>
-        row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(",")
-      );
+  const csvContent = "\uFEFF" + csvLines.join("\r\n");
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
 
-      const csvContent = "\uFEFF" + csvLines.join("\r\n");
-      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `LISTEN_status_${dateValue.replaceAll("-", "")}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `LISTEN_status_${dateValue.replaceAll("-", "")}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }
+  statusMessage.textContent = "CSVを出力しました";
+
+  setTimeout(() => {
+    statusMessage.textContent = "";
+  }, 3000);
+}
 
     async function saveClock(actionType) {
       if (!selectedEmployee) {
