@@ -1,4 +1,4 @@
 const CONFIG = {
   APP_NAME: "LISTEN Time Clock",
-  GAS_URL: "https://script.google.com/macros/s/AKfycbwLe6JKESWAW181TU9Gk6OJSoP6Xn1BICwMDpUsduTB62-hnrF50Kp3bSh0G0BfbME/exec"
+  GAS_URL: "https://script.google.com/macros/s/AKfycbzOssukVTXltgZ-DJ7azSx5r-Gm4svqr2FpPajiHao-HbNF72m2mTDbyS6PSfxcF0Gd/exec"
 };
