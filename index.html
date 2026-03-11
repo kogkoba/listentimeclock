@@ -255,12 +255,12 @@
       <div class="card">
         <div class="section-title">全員の出退勤状況</div>
 
-        <div class="date-row">
-          <label for="statusDate">日付</label>
-          <input type="date" id="statusDate" class="date-input">
-          <button id="loadStatusBtn" class="reload-btn">表示</button>
-        </div>
-
+<div class="date-row">
+  <label for="statusDate">日付</label>
+  <input type="date" id="statusDate" class="date-input">
+  <button id="loadStatusBtn" class="reload-btn">表示</button>
+  <button id="exportCsvBtn" class="sub-btn">CSV出力</button>
+</div>
         <div class="message" id="statusMessage"></div>
 
         <div class="status-table-wrap">
@@ -282,6 +282,7 @@
 
   <script src="config.js"></script>
   <script>
+    let currentStatuses = [];
     let employees = [];
     let selectedEmployee = "";
     let lastClock = {
