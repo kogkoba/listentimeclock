@@ -15,7 +15,7 @@
     }
 
     .container {
-      max-width: 980px;
+      max-width: 1080px;
       margin: 0 auto;
       padding: 24px 16px 40px;
     }
@@ -126,7 +126,7 @@
 
     .message {
       text-align: center;
-      font-size: 1.1rem;
+      font-size: 1.05rem;
       min-height: 1.5em;
       font-weight: bold;
       white-space: pre-line;
@@ -142,13 +142,22 @@
       align-items: center;
       flex-wrap: wrap;
       margin-bottom: 16px;
+      justify-content: space-between;
     }
 
-    .date-input {
+    .date-row-left {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .date-input, .time-input, .password-input, .month-input, .name-select {
       padding: 12px;
       font-size: 1rem;
       border-radius: 10px;
       border: 1px solid #ccc;
+      background: #fff;
     }
 
     .reload-btn {
@@ -173,6 +182,30 @@
       cursor: pointer;
     }
 
+    .admin-btn {
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 0.85rem;
+      background: #f8fafc;
+      color: #64748b;
+      cursor: pointer;
+    }
+
+    .admin-bar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+      justify-content: flex-end;
+    }
+
+    .admin-status {
+      font-size: 0.9rem;
+      color: #475569;
+    }
+
     .status-table-wrap {
       overflow-x: auto;
     }
@@ -180,7 +213,7 @@
     .status-table {
       width: 100%;
       border-collapse: collapse;
-      min-width: 520px;
+      min-width: 760px;
     }
 
     .status-table th,
@@ -188,6 +221,7 @@
       border-bottom: 1px solid #ddd;
       padding: 12px 10px;
       text-align: center;
+      vertical-align: middle;
     }
 
     .status-table th {
@@ -221,11 +255,68 @@
       color: #b91c1c;
     }
 
+    .edit-link-btn {
+      border: none;
+      background: transparent;
+      color: #2563eb;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 0.95rem;
+    }
+
+    .edit-row {
+      background: #f8fafc;
+    }
+
+    .edit-box {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      padding: 6px 0;
+    }
+
+    .save-edit-btn {
+      border: none;
+      border-radius: 8px;
+      padding: 10px 14px;
+      background: #2563eb;
+      color: #fff;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .cancel-edit-btn {
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 10px 14px;
+      background: #fff;
+      color: #475569;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .monthly-box {
+      margin-top: 18px;
+      padding-top: 16px;
+      border-top: 1px solid #e5e7eb;
+    }
+
+    .monthly-row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
     @media (max-width: 700px) {
       .employee-grid { grid-template-columns: 1fr; }
       .action-buttons { grid-template-columns: 1fr; }
       .tabs { grid-template-columns: 1fr 1fr; }
       h1 { font-size: 1.7rem; }
+      .date-row { justify-content: flex-start; }
+      .admin-bar { justify-content: flex-start; }
     }
   </style>
 </head>
@@ -266,11 +357,23 @@
       <div class="card">
         <div class="section-title">全員の出退勤状況</div>
 
+        <div class="admin-bar">
+          <span class="admin-status" id="adminStatus">管理者モード: OFF</span>
+          <button id="adminToggleBtn" class="admin-btn">管理者</button>
+          <div id="adminLoginArea" class="hidden">
+            <input type="password" id="adminPassword" class="password-input" placeholder="パスワード">
+            <button id="adminLoginBtn" class="sub-btn">ログイン</button>
+            <button id="adminLogoutBtn" class="sub-btn hidden">解除</button>
+          </div>
+        </div>
+
         <div class="date-row">
-          <label for="statusDate">日付</label>
-          <input type="date" id="statusDate" class="date-input">
-          <button id="loadStatusBtn" class="reload-btn">表示</button>
-          <button id="exportCsvBtn" class="sub-btn">CSV出力</button>
+          <div class="date-row-left">
+            <label for="statusDate">日付</label>
+            <input type="date" id="statusDate" class="date-input">
+            <button id="loadStatusBtn" class="reload-btn">表示</button>
+            <button id="exportCsvBtn" class="sub-btn">CSV出力</button>
+          </div>
         </div>
 
         <div class="message" id="statusMessage"></div>
@@ -283,10 +386,20 @@
                 <th>出勤</th>
                 <th>退勤</th>
                 <th>状態</th>
+                <th id="editHeader" class="hidden">編集</th>
               </tr>
             </thead>
             <tbody id="statusTableBody"></tbody>
           </table>
+        </div>
+
+        <div class="monthly-box">
+          <div class="section-title">人別・月ごとCSV出力</div>
+          <div class="monthly-row">
+            <select id="monthlyNameSelect" class="name-select"></select>
+            <input type="month" id="monthlyMonth" class="month-input">
+            <button id="exportMonthlyCsvBtn" class="sub-btn">月次CSV出力</button>
+          </div>
         </div>
       </div>
     </div>
@@ -297,6 +410,11 @@
     let employees = [];
     let selectedEmployee = "";
     let currentStatuses = [];
+    let editingName = "";
+    let isAdminMode = false;
+
+    const ADMIN_PASSWORD = "listen-admin";
+
     let lastClock = {
       employeeId: "",
       actionType: "",
@@ -319,6 +437,18 @@
     const exportCsvBtn = document.getElementById("exportCsvBtn");
     const statusMessage = document.getElementById("statusMessage");
     const statusTableBody = document.getElementById("statusTableBody");
+    const editHeader = document.getElementById("editHeader");
+
+    const adminToggleBtn = document.getElementById("adminToggleBtn");
+    const adminLoginArea = document.getElementById("adminLoginArea");
+    const adminPassword = document.getElementById("adminPassword");
+    const adminLoginBtn = document.getElementById("adminLoginBtn");
+    const adminLogoutBtn = document.getElementById("adminLogoutBtn");
+    const adminStatus = document.getElementById("adminStatus");
+
+    const monthlyNameSelect = document.getElementById("monthlyNameSelect");
+    const monthlyMonth = document.getElementById("monthlyMonth");
+    const exportMonthlyCsvBtn = document.getElementById("exportMonthlyCsvBtn");
 
     function updateClock() {
       const now = new Date();
@@ -337,6 +467,13 @@
       return `${y}-${m}-${d}`;
     }
 
+    function getCurrentMonthForInput() {
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, "0");
+      return `${y}-${m}`;
+    }
+
     function setActiveTab(mode) {
       if (mode === "clock") {
         tabClockBtn.classList.add("active");
@@ -349,6 +486,13 @@
         clockView.classList.add("hidden");
         statusView.classList.remove("hidden");
       }
+    }
+
+    function updateAdminUi() {
+      adminStatus.textContent = `管理者モード: ${isAdminMode ? "ON" : "OFF"}`;
+      editHeader.classList.toggle("hidden", !isAdminMode);
+      adminLogoutBtn.classList.toggle("hidden", !isAdminMode);
+      renderStatusTable(currentStatuses);
     }
 
     function renderEmployees() {
@@ -379,6 +523,16 @@
       });
     }
 
+    function renderMonthlySelect() {
+      monthlyNameSelect.innerHTML = "";
+      employees.forEach(emp => {
+        const option = document.createElement("option");
+        option.value = emp.name;
+        option.textContent = emp.name;
+        monthlyNameSelect.appendChild(option);
+      });
+    }
+
     async function loadEmployees() {
       try {
         message.textContent = "従業員一覧を読み込み中...";
@@ -391,6 +545,7 @@
 
         employees = data.employees || [];
         renderEmployees();
+        renderMonthlySelect();
         message.textContent = "";
       } catch (error) {
         console.error(error);
@@ -399,18 +554,10 @@
     }
 
     function getStatusBadge(status) {
-      if (status === "未出勤") {
-        return '<span class="status-badge status-mis">未出勤</span>';
-      }
-      if (status === "勤務中") {
-        return '<span class="status-badge status-working">勤務中</span>';
-      }
-      if (status === "退勤済") {
-        return '<span class="status-badge status-done">退勤済</span>';
-      }
-      if (status === "要確認") {
-        return '<span class="status-badge status-check">要確認</span>';
-      }
+      if (status === "未出勤") return '<span class="status-badge status-mis">未出勤</span>';
+      if (status === "勤務中") return '<span class="status-badge status-working">勤務中</span>';
+      if (status === "退勤済") return '<span class="status-badge status-done">退勤済</span>';
+      if (status === "要確認") return '<span class="status-badge status-check">要確認</span>';
       return status;
     }
 
@@ -418,7 +565,8 @@
       statusTableBody.innerHTML = "";
 
       if (!statuses.length) {
-        statusTableBody.innerHTML = '<tr><td colspan="4">データがありません</td></tr>';
+        const colSpan = isAdminMode ? 5 : 4;
+        statusTableBody.innerHTML = `<tr><td colspan="${colSpan}">データがありません</td></tr>`;
         return;
       }
 
@@ -429,9 +577,59 @@
           <td>${item.clockIn || ""}</td>
           <td>${item.clockOut || ""}</td>
           <td>${getStatusBadge(item.status)}</td>
+          ${isAdminMode ? `<td><button class="edit-link-btn" data-name="${item.name}">編集</button></td>` : ""}
         `;
         statusTableBody.appendChild(tr);
+
+        if (isAdminMode && editingName === item.name) {
+          const editTr = document.createElement("tr");
+          editTr.className = "edit-row";
+          editTr.innerHTML = `
+            <td colspan="5">
+              <div class="edit-box">
+                <span>${item.name}</span>
+                <label>出勤</label>
+                <input type="time" step="1" id="editClockIn" class="time-input" value="${item.clockIn || ""}">
+                <label>退勤</label>
+                <input type="time" step="1" id="editClockOut" class="time-input" value="${item.clockOut || ""}">
+                <button class="save-edit-btn" id="saveEditBtn">保存</button>
+                <button class="cancel-edit-btn" id="cancelEditBtn">キャンセル</button>
+              </div>
+            </td>
+          `;
+          statusTableBody.appendChild(editTr);
+        }
       });
+
+      if (isAdminMode) {
+        document.querySelectorAll(".edit-link-btn").forEach(btn => {
+          btn.addEventListener("click", () => {
+            editingName = btn.dataset.name;
+            renderStatusTable(currentStatuses);
+            bindEditButtons();
+          });
+        });
+
+        bindEditButtons();
+      }
+    }
+
+    function bindEditButtons() {
+      const saveEditBtn = document.getElementById("saveEditBtn");
+      const cancelEditBtn = document.getElementById("cancelEditBtn");
+
+      if (saveEditBtn) {
+        saveEditBtn.addEventListener("click", () => {
+          saveEdit();
+        });
+      }
+
+      if (cancelEditBtn) {
+        cancelEditBtn.addEventListener("click", () => {
+          editingName = "";
+          renderStatusTable(currentStatuses);
+        });
+      }
     }
 
     async function loadDailyStatus() {
@@ -448,6 +646,7 @@
         }
 
         currentStatuses = data.statuses || [];
+        editingName = "";
         renderStatusTable(currentStatuses);
         statusMessage.textContent = "";
       } catch (error) {
@@ -455,45 +654,132 @@
         statusMessage.textContent = "一覧の取得に失敗しました";
       }
     }
-function exportStatusCsv() {
-  if (!currentStatuses.length) {
-    statusMessage.textContent = "出力できるデータがありません";
-    return;
-  }
 
-  const dateValue = statusDate.value || getTodayForInput();
-  const header = ["日付", "氏名", "出勤", "退勤", "状態"];
+    async function saveEdit() {
+      const editClockIn = document.getElementById("editClockIn");
+      const editClockOut = document.getElementById("editClockOut");
 
-  const rows = currentStatuses.map(item => [
-    dateValue.replaceAll("-", "/"),
-    item.name || "",
-    item.clockIn || "",
-    item.clockOut || "",
-    item.status || ""
-  ]);
+      if (!editingName) {
+        statusMessage.textContent = "編集対象がありません";
+        return;
+      }
 
-  const csvLines = [header, ...rows].map(row =>
-    row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(",")
-  );
+      try {
+        statusMessage.textContent = "修正を保存中...";
+        const response = await fetch(CONFIG.GAS_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "text/plain;charset=utf-8"
+          },
+          body: JSON.stringify({
+            action: "saveEdit",
+            date: formatDateForApi(statusDate.value),
+            name: editingName,
+            clockIn: editClockIn ? editClockIn.value : "",
+            clockOut: editClockOut ? editClockOut.value : "",
+            editedBy: "代表"
+          })
+        });
 
-  const csvContent = "\uFEFF" + csvLines.join("\r\n");
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
+        const data = await response.json();
 
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `LISTEN_status_${dateValue.replaceAll("-", "")}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+        if (!data.success) {
+          throw new Error(data.message || "修正保存に失敗しました");
+        }
 
-  statusMessage.textContent = "CSVを出力しました";
+        statusMessage.textContent = data.message;
+        editingName = "";
+        await loadDailyStatus();
+      } catch (error) {
+        console.error(error);
+        statusMessage.textContent = "修正保存に失敗しました";
+      }
+    }
 
-  setTimeout(() => {
-    statusMessage.textContent = "";
-  }, 3000);
-}
+    function exportStatusCsv() {
+      if (!currentStatuses.length) {
+        statusMessage.textContent = "出力できるデータがありません";
+        return;
+      }
+
+      const dateValue = statusDate.value || getTodayForInput();
+      const header = ["日付", "氏名", "出勤", "退勤", "状態"];
+
+      const rows = currentStatuses.map(item => [
+        dateValue.replaceAll("-", "/"),
+        item.name || "",
+        item.clockIn || "",
+        item.clockOut || "",
+        item.status || ""
+      ]);
+
+      const csvLines = [header, ...rows].map(row =>
+        row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(",")
+      );
+
+      const csvContent = "\uFEFF" + csvLines.join("\r\n");
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+
+      window.open(url, "_blank");
+
+      statusMessage.textContent = "CSVを新しいタブで開きました";
+
+      setTimeout(() => {
+        statusMessage.textContent = "";
+      }, 3000);
+    }
+
+    async function exportMonthlyCsv() {
+      const name = monthlyNameSelect.value;
+      const month = monthlyMonth.value;
+
+      if (!name || !month) {
+        statusMessage.textContent = "職員名と年月を選択してください";
+        return;
+      }
+
+      try {
+        statusMessage.textContent = "月次CSVデータを取得中...";
+        const response = await fetch(
+          `${CONFIG.GAS_URL}?action=getMonthlyStatus&name=${encodeURIComponent(name)}&month=${encodeURIComponent(month.replace("-", "/"))}`
+        );
+        const data = await response.json();
+
+        if (!data.success) {
+          throw new Error(data.message || "月次CSVデータの取得に失敗しました");
+        }
+
+        const header = ["日付", "曜日", "氏名", "出勤", "退勤", "状態"];
+        const rows = (data.rows || []).map(item => [
+          item.date || "",
+          item.weekday || "",
+          item.name || "",
+          item.clockIn || "",
+          item.clockOut || "",
+          item.status || ""
+        ]);
+
+        if (!rows.length) {
+          statusMessage.textContent = "出力できる月次データがありません";
+          return;
+        }
+
+        const csvLines = [header, ...rows].map(row =>
+          row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(",")
+        );
+
+        const csvContent = "\uFEFF" + csvLines.join("\r\n");
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+
+        window.open(url, "_blank");
+        statusMessage.textContent = "月次CSVを新しいタブで開きました";
+      } catch (error) {
+        console.error(error);
+        statusMessage.textContent = "月次CSVデータの取得に失敗しました";
+      }
+    }
 
     async function saveClock(actionType) {
       if (!selectedEmployee) {
@@ -508,9 +794,7 @@ function exportStatusCsv() {
 
       if (isSameEmployee && isSameAction && isWithin10Seconds) {
         const ok = confirm(`${selectedEmployee.name} さんの${actionType}が直前にも記録されています。もう一度記録しますか？`);
-        if (!ok) {
-          return;
-        }
+        if (!ok) return;
       }
 
       try {
@@ -573,6 +857,33 @@ function exportStatusCsv() {
       exportStatusCsv();
     });
 
+    exportMonthlyCsvBtn.addEventListener("click", () => {
+      exportMonthlyCsv();
+    });
+
+    adminToggleBtn.addEventListener("click", () => {
+      adminLoginArea.classList.toggle("hidden");
+    });
+
+    adminLoginBtn.addEventListener("click", () => {
+      if (adminPassword.value === ADMIN_PASSWORD) {
+        isAdminMode = true;
+        adminPassword.value = "";
+        statusMessage.textContent = "管理者モードを有効にしました";
+      } else {
+        isAdminMode = false;
+        statusMessage.textContent = "パスワードが違います";
+      }
+      updateAdminUi();
+    });
+
+    adminLogoutBtn.addEventListener("click", () => {
+      isAdminMode = false;
+      editingName = "";
+      statusMessage.textContent = "管理者モードを解除しました";
+      updateAdminUi();
+    });
+
     clockInBtn.addEventListener("click", () => saveClock("出勤"));
     clockOutBtn.addEventListener("click", () => saveClock("退勤"));
 
@@ -580,9 +891,11 @@ function exportStatusCsv() {
     setInterval(updateClock, 1000);
 
     statusDate.value = getTodayForInput();
+    monthlyMonth.value = getCurrentMonthForInput();
 
     loadEmployees();
     loadDailyStatus();
+    updateAdminUi();
   </script>
 </body>
 </html>
