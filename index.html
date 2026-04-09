@@ -152,7 +152,11 @@
       flex-wrap: wrap;
     }
 
-    .date-input, .time-input, .password-input, .month-input, .name-select {
+    .date-input,
+    .time-input,
+    .password-input,
+    .month-input,
+    .name-select {
       padding: 12px;
       font-size: 1rem;
       border-radius: 10px;
@@ -322,7 +326,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>LISTEN Time Clock</h1>
+    <h1 id="appTitle">LISTEN Time Clock</h1>
     <div class="clock" id="clock"></div>
 
     <div class="tabs">
@@ -408,7 +412,7 @@
   <script src="config.js"></script>
   <script>
     let employees = [];
-    let selectedEmployee = "";
+    let selectedEmployee = null;
     let currentStatuses = [];
     let editingName = "";
     let isAdminMode = false;
@@ -450,13 +454,24 @@
     const monthlyMonth = document.getElementById("monthlyMonth");
     const exportMonthlyCsvBtn = document.getElementById("exportMonthlyCsvBtn");
 
+    function setAppTitle() {
+      try {
+        if (typeof CONFIG !== "undefined" && CONFIG.APP_NAME) {
+          document.title = CONFIG.APP_NAME;
+          document.getElementById("appTitle").textContent = CONFIG.APP_NAME;
+        }
+      } catch (e) {
+        console.error("setAppTitle error:", e);
+      }
+    }
+
     function updateClock() {
       const now = new Date();
       document.getElementById("clock").textContent = now.toLocaleString("ja-JP");
     }
 
     function formatDateForApi(dateValue) {
-      return dateValue.replaceAll("-", "/");
+      return String(dateValue || "").replaceAll("-", "/");
     }
 
     function getTodayForInput() {
@@ -495,6 +510,15 @@
       renderStatusTable(currentStatuses);
     }
 
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
     function renderEmployees() {
       employeeList.innerHTML = "";
 
@@ -506,7 +530,7 @@
       employees.forEach((employee) => {
         const button = document.createElement("button");
         button.className = "employee-btn";
-        button.textContent = employee.name;
+        button.textContent = employee.name || "";
 
         if (selectedEmployee && selectedEmployee.employee_id === employee.employee_id) {
           button.classList.add("selected");
@@ -514,7 +538,7 @@
 
         button.addEventListener("click", () => {
           selectedEmployee = employee;
-          selectedName.textContent = employee.name;
+          selectedName.textContent = employee.name || "";
           message.textContent = "";
           renderEmployees();
         });
@@ -525,31 +549,56 @@
 
     function renderMonthlySelect() {
       monthlyNameSelect.innerHTML = "";
-      employees.forEach(emp => {
+
+      employees.forEach((emp) => {
         const option = document.createElement("option");
-        option.value = emp.name;
-        option.textContent = emp.name;
+        option.value = emp.name || "";
+        option.textContent = emp.name || "";
         monthlyNameSelect.appendChild(option);
       });
+    }
+
+    async function safeJson(response) {
+      const text = await response.text();
+      try {
+        return JSON.parse(text);
+      } catch (e) {
+        throw new Error(`JSONではない応答です: ${text.slice(0, 200)}`);
+      }
     }
 
     async function loadEmployees() {
       try {
         message.textContent = "従業員一覧を読み込み中...";
-        const response = await fetch(`${CONFIG.GAS_URL}?action=getEmployees`);
-        const data = await response.json();
+
+        if (typeof CONFIG === "undefined" || !CONFIG.GAS_URL) {
+          throw new Error("config.js の GAS_URL が読み込めていません");
+        }
+
+        const url = `${CONFIG.GAS_URL}?action=getEmployees&_ts=${Date.now()}`;
+        console.log("loadEmployees URL:", url);
+
+        const response = await fetch(url, {
+          method: "GET",
+          cache: "no-store"
+        });
+
+        const data = await safeJson(response);
+        console.log("loadEmployees response:", data);
 
         if (!data.success) {
           throw new Error(data.message || "従業員一覧の取得に失敗しました");
         }
 
-        employees = data.employees || [];
+        employees = Array.isArray(data.employees) ? data.employees : [];
         renderEmployees();
         renderMonthlySelect();
         message.textContent = "";
       } catch (error) {
-        console.error(error);
-        message.textContent = "従業員一覧の取得に失敗しました";
+        console.error("loadEmployees error:", error);
+        employees = [];
+        renderEmployees();
+        message.textContent = `従業員一覧の取得に失敗しました: ${error.message}`;
       }
     }
 
@@ -558,7 +607,7 @@
       if (status === "勤務中") return '<span class="status-badge status-working">勤務中</span>';
       if (status === "退勤済") return '<span class="status-badge status-done">退勤済</span>';
       if (status === "要確認") return '<span class="status-badge status-check">要確認</span>';
-      return status;
+      return escapeHtml(status || "");
     }
 
     function renderStatusTable(statuses) {
@@ -573,11 +622,11 @@
       statuses.forEach((item) => {
         const tr = document.createElement("tr");
         tr.innerHTML = `
-          <td>${item.name || ""}</td>
-          <td>${item.clockIn || ""}</td>
-          <td>${item.clockOut || ""}</td>
+          <td>${escapeHtml(item.name || "")}</td>
+          <td>${escapeHtml(item.clockIn || "")}</td>
+          <td>${escapeHtml(item.clockOut || "")}</td>
           <td>${getStatusBadge(item.status)}</td>
-          ${isAdminMode ? `<td><button class="edit-link-btn" data-name="${item.name}">編集</button></td>` : ""}
+          ${isAdminMode ? `<td><button class="edit-link-btn" data-name="${escapeHtml(item.name || "")}">編集</button></td>` : ""}
         `;
         statusTableBody.appendChild(tr);
 
@@ -587,11 +636,11 @@
           editTr.innerHTML = `
             <td colspan="5">
               <div class="edit-box">
-                <span>${item.name}</span>
+                <span>${escapeHtml(item.name || "")}</span>
                 <label>出勤</label>
-                <input type="time" step="1" id="editClockIn" class="time-input" value="${item.clockIn || ""}">
+                <input type="time" step="1" id="editClockIn" class="time-input" value="${escapeHtml(item.clockIn || "")}">
                 <label>退勤</label>
-                <input type="time" step="1" id="editClockOut" class="time-input" value="${item.clockOut || ""}">
+                <input type="time" step="1" id="editClockOut" class="time-input" value="${escapeHtml(item.clockOut || "")}">
                 <button class="save-edit-btn" id="saveEditBtn">保存</button>
                 <button class="cancel-edit-btn" id="cancelEditBtn">キャンセル</button>
               </div>
@@ -602,7 +651,7 @@
       });
 
       if (isAdminMode) {
-        document.querySelectorAll(".edit-link-btn").forEach(btn => {
+        document.querySelectorAll(".edit-link-btn").forEach((btn) => {
           btn.addEventListener("click", () => {
             editingName = btn.dataset.name;
             renderStatusTable(currentStatuses);
@@ -619,9 +668,7 @@
       const cancelEditBtn = document.getElementById("cancelEditBtn");
 
       if (saveEditBtn) {
-        saveEditBtn.addEventListener("click", () => {
-          saveEdit();
-        });
+        saveEditBtn.addEventListener("click", saveEdit);
       }
 
       if (cancelEditBtn) {
@@ -632,34 +679,43 @@
       }
     }
 
-async function loadDailyStatus() {
-  try {
-    statusMessage.textContent = "一覧を読み込み中...";
-    const dateValue = statusDate.value;
-    const apiDate = formatDateForApi(dateValue);
-    const url = `${CONFIG.GAS_URL}?action=getDailyStatus&date=${encodeURIComponent(apiDate)}&_ts=${Date.now()}`;
+    async function loadDailyStatus() {
+      try {
+        statusMessage.textContent = "一覧を読み込み中...";
 
-    const response = await fetch(url, {
-      method: "GET",
-      cache: "no-store"
-    });
-    const data = await response.json();
+        if (typeof CONFIG === "undefined" || !CONFIG.GAS_URL) {
+          throw new Error("config.js の GAS_URL が読み込めていません");
+        }
 
-    console.log("loadDailyStatus response:", data);
+        const dateValue = statusDate.value || getTodayForInput();
+        const apiDate = formatDateForApi(dateValue);
+        const url = `${CONFIG.GAS_URL}?action=getDailyStatus&date=${encodeURIComponent(apiDate)}&_ts=${Date.now()}`;
+        console.log("loadDailyStatus URL:", url);
 
-    if (!data.success) {
-      throw new Error(data.message || "一覧の取得に失敗しました");
+        const response = await fetch(url, {
+          method: "GET",
+          cache: "no-store"
+        });
+
+        const data = await safeJson(response);
+        console.log("loadDailyStatus response:", data);
+
+        if (!data.success) {
+          throw new Error(data.message || "一覧の取得に失敗しました");
+        }
+
+        currentStatuses = Array.isArray(data.statuses) ? data.statuses : [];
+        editingName = "";
+        renderStatusTable(currentStatuses);
+        statusMessage.textContent = "";
+      } catch (error) {
+        console.error("loadDailyStatus error:", error);
+        currentStatuses = [];
+        renderStatusTable(currentStatuses);
+        statusMessage.textContent = `一覧の取得に失敗しました: ${error.message}`;
+      }
     }
 
-    currentStatuses = data.statuses || [];
-    editingName = "";
-    renderStatusTable(currentStatuses);
-    statusMessage.textContent = "";
-  } catch (error) {
-    console.error(error);
-    statusMessage.textContent = `一覧の取得に失敗しました: ${error.message}`;
-  }
-}
     function exportStatusCsv() {
       if (!currentStatuses.length) {
         statusMessage.textContent = "出力できるデータがありません";
@@ -669,7 +725,7 @@ async function loadDailyStatus() {
       const dateValue = statusDate.value || getTodayForInput();
       const header = ["日付", "氏名", "出勤", "退勤", "状態"];
 
-      const rows = currentStatuses.map(item => [
+      const rows = currentStatuses.map((item) => [
         dateValue.replaceAll("-", "/"),
         item.name || "",
         item.clockIn || "",
@@ -677,8 +733,8 @@ async function loadDailyStatus() {
         item.status || ""
       ]);
 
-      const csvLines = [header, ...rows].map(row =>
-        row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(",")
+      const csvLines = [header, ...rows].map((row) =>
+        row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(",")
       );
 
       const csvContent = "\uFEFF" + csvLines.join("\r\n");
@@ -686,7 +742,6 @@ async function loadDailyStatus() {
       const url = URL.createObjectURL(blob);
 
       window.open(url, "_blank");
-
       statusMessage.textContent = "CSVを新しいタブで開きました";
 
       setTimeout(() => {
@@ -705,17 +760,28 @@ async function loadDailyStatus() {
 
       try {
         statusMessage.textContent = "月次CSVデータを取得中...";
-        const response = await fetch(
-          `${CONFIG.GAS_URL}?action=getMonthlyStatus&name=${encodeURIComponent(name)}&month=${encodeURIComponent(month.replace("-", "/"))}`
-        );
-        const data = await response.json();
+
+        if (typeof CONFIG === "undefined" || !CONFIG.GAS_URL) {
+          throw new Error("config.js の GAS_URL が読み込めていません");
+        }
+
+        const url = `${CONFIG.GAS_URL}?action=getMonthlyStatus&name=${encodeURIComponent(name)}&month=${encodeURIComponent(month.replace("-", "/"))}&_ts=${Date.now()}`;
+        console.log("exportMonthlyCsv URL:", url);
+
+        const response = await fetch(url, {
+          method: "GET",
+          cache: "no-store"
+        });
+
+        const data = await safeJson(response);
+        console.log("exportMonthlyCsv response:", data);
 
         if (!data.success) {
           throw new Error(data.message || "月次CSVデータの取得に失敗しました");
         }
 
         const header = ["日付", "曜日", "氏名", "出勤", "退勤", "状態"];
-        const rows = (data.rows || []).map(item => [
+        const rows = (data.rows || []).map((item) => [
           item.date || "",
           item.weekday || "",
           item.name || "",
@@ -729,104 +795,163 @@ async function loadDailyStatus() {
           return;
         }
 
-        const csvLines = [header, ...rows].map(row =>
-          row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(",")
+        const csvLines = [header, ...rows].map((row) =>
+          row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(",")
         );
 
         const csvContent = "\uFEFF" + csvLines.join("\r\n");
         const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-        const url = URL.createObjectURL(blob);
+        const url2 = URL.createObjectURL(blob);
 
-        window.open(url, "_blank");
+        window.open(url2, "_blank");
         statusMessage.textContent = "月次CSVを新しいタブで開きました";
       } catch (error) {
-        console.error(error);
-        statusMessage.textContent = "月次CSVデータの取得に失敗しました";
+        console.error("exportMonthlyCsv error:", error);
+        statusMessage.textContent = `月次CSVデータの取得に失敗しました: ${error.message}`;
       }
     }
 
-async function saveClock(actionType) {
-  if (!selectedEmployee) {
-    message.textContent = "従業員を選択してください";
-    return;
-  }
+    async function saveClock(actionType) {
+      if (!selectedEmployee) {
+        message.textContent = "従業員を選択してください";
+        return;
+      }
 
-  const now = Date.now();
-  const isSameEmployee = lastClock.employeeId === selectedEmployee.employee_id;
-  const isSameAction = lastClock.actionType === actionType;
-  const isWithin10Seconds = now - lastClock.timestamp < 10000;
+      const now = Date.now();
+      const isSameEmployee = lastClock.employeeId === selectedEmployee.employee_id;
+      const isSameAction = lastClock.actionType === actionType;
+      const isWithin10Seconds = now - lastClock.timestamp < 10000;
 
-  if (isSameEmployee && isSameAction && isWithin10Seconds) {
-    const ok = confirm(`${selectedEmployee.name} さんの${actionType}が直前にも記録されています。もう一度記録しますか？`);
-    if (!ok) return;
-  }
+      if (isSameEmployee && isSameAction && isWithin10Seconds) {
+        const ok = confirm(`${selectedEmployee.name} さんの${actionType}が直前にも記録されています。もう一度記録しますか？`);
+        if (!ok) return;
+      }
 
-  try {
-    message.textContent = "保存中...";
-    const response = await fetch(CONFIG.GAS_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "text/plain;charset=utf-8"
-      },
-      body: JSON.stringify({
-        action: "clock",
-        name: selectedEmployee.name,
-        employee_id: selectedEmployee.employee_id,
-        actionType: actionType
-      })
-    });
+      try {
+        message.textContent = "保存中...";
 
-    const data = await response.json();
-    console.log("saveClock response:", data);
+        if (typeof CONFIG === "undefined" || !CONFIG.GAS_URL) {
+          throw new Error("config.js の GAS_URL が読み込めていません");
+        }
 
-    if (!data.success) {
-      throw new Error(data.message || "保存に失敗しました");
+        const response = await fetch(CONFIG.GAS_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "text/plain;charset=utf-8"
+          },
+          body: JSON.stringify({
+            action: "clock",
+            name: selectedEmployee.name,
+            employee_id: selectedEmployee.employee_id,
+            actionType: actionType
+          })
+        });
+
+        const data = await safeJson(response);
+        console.log("saveClock response:", data);
+
+        if (!data.success) {
+          throw new Error(data.message || "保存に失敗しました");
+        }
+
+        message.textContent = data.message || "保存しました";
+
+        lastClock = {
+          employeeId: selectedEmployee.employee_id,
+          actionType: actionType,
+          timestamp: now
+        };
+
+        selectedEmployee = null;
+        selectedName.textContent = "未選択";
+        renderEmployees();
+
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        await loadDailyStatus();
+
+        setTimeout(() => {
+          message.textContent = "";
+        }, 3000);
+      } catch (error) {
+        console.error("saveClock error:", error);
+        message.textContent = `保存に失敗しました: ${error.message}`;
+      }
     }
 
-    message.textContent = data.message;
+    async function saveEdit() {
+      if (!isAdminMode) {
+        statusMessage.textContent = "管理者モードでログインしてください";
+        return;
+      }
 
-    lastClock = {
-      employeeId: selectedEmployee.employee_id,
-      actionType: actionType,
-      timestamp: now
-    };
+      if (!editingName) {
+        statusMessage.textContent = "編集対象が選ばれていません";
+        return;
+      }
 
-    selectedEmployee = "";
-    selectedName.textContent = "未選択";
-    renderEmployees();
+      const dateValue = statusDate.value || getTodayForInput();
+      const clockInEl = document.getElementById("editClockIn");
+      const clockOutEl = document.getElementById("editClockOut");
 
-    await new Promise(resolve => setTimeout(resolve, 500));
-    await loadDailyStatus();
-    
-    setTimeout(() => {
-      message.textContent = "";
-    }, 3000);
+      const clockIn = clockInEl ? clockInEl.value : "";
+      const clockOut = clockOutEl ? clockOutEl.value : "";
 
-  } catch (error) {
-    console.error(error);
-    message.textContent = `保存に失敗しました: ${error.message}`;
-  }
-}
+      try {
+        statusMessage.textContent = "修正内容を保存中...";
+
+        if (typeof CONFIG === "undefined" || !CONFIG.GAS_URL) {
+          throw new Error("config.js の GAS_URL が読み込めていません");
+        }
+
+        const response = await fetch(CONFIG.GAS_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "text/plain;charset=utf-8"
+          },
+          body: JSON.stringify({
+            action: "saveEdit",
+            date: formatDateForApi(dateValue),
+            name: editingName,
+            clockIn: clockIn,
+            clockOut: clockOut
+          })
+        });
+
+        const data = await safeJson(response);
+        console.log("saveEdit response:", data);
+
+        if (!data.success) {
+          throw new Error(data.message || "修正の保存に失敗しました");
+        }
+
+        editingName = "";
+        statusMessage.textContent = data.message || "修正を保存しました";
+        await loadDailyStatus();
+      } catch (error) {
+        console.error("saveEdit error:", error);
+        statusMessage.textContent = `修正の保存に失敗しました: ${error.message}`;
+      }
+    }
 
     tabClockBtn.addEventListener("click", () => {
       setActiveTab("clock");
     });
 
-    tabStatusBtn.addEventListener("click", () => {
+    tabStatusBtn.addEventListener("click", async () => {
       setActiveTab("status");
-      loadDailyStatus();
+      await loadDailyStatus();
     });
 
-    loadStatusBtn.addEventListener("click", () => {
-      loadDailyStatus();
+    loadStatusBtn.addEventListener("click", async () => {
+      await loadDailyStatus();
     });
 
     exportCsvBtn.addEventListener("click", () => {
       exportStatusCsv();
     });
 
-    exportMonthlyCsvBtn.addEventListener("click", () => {
-      exportMonthlyCsv();
+    exportMonthlyCsvBtn.addEventListener("click", async () => {
+      await exportMonthlyCsv();
     });
 
     adminToggleBtn.addEventListener("click", () => {
@@ -855,15 +980,20 @@ async function saveClock(actionType) {
     clockInBtn.addEventListener("click", () => saveClock("出勤"));
     clockOutBtn.addEventListener("click", () => saveClock("退勤"));
 
-    updateClock();
-    setInterval(updateClock, 1000);
+    async function init() {
+      setAppTitle();
+      updateClock();
+      setInterval(updateClock, 1000);
 
-    statusDate.value = getTodayForInput();
-    monthlyMonth.value = getCurrentMonthForInput();
+      statusDate.value = getTodayForInput();
+      monthlyMonth.value = getCurrentMonthForInput();
 
-    loadEmployees();
-    loadDailyStatus();
-    updateAdminUi();
+      updateAdminUi();
+      await loadEmployees();
+      await loadDailyStatus();
+    }
+
+    init();
   </script>
 </body>
 </html>
